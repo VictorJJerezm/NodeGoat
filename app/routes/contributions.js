@@ -29,10 +29,19 @@ function ContributionsHandler(db) {
 
         /*jslint evil: true */
         // Insecure use of eval() to parse inputs
-        const preTax = eval(req.body.preTax);
-        const afterTax = eval(req.body.afterTax);
-        const roth = eval(req.body.roth);
+        const parsePercentage = (value) => {
+            if (typeof value !== "string") return NaN;
 
+            const input = value.trim();
+            if (!/^\d+(?:\.\d+)?$/.test(input)) return NaN;
+
+            const number = Number(input);
+            return Number.isFinite(number) ? number : NaN;
+        };
+
+        const preTax = parsePercentage(req.body.preTax);
+        const afterTax = parsePercentage(req.body.afterTax);
+        const roth = parsePercentage(req.body.roth);
         /*
         //Fix for A1 -1 SSJS Injection attacks - uses alternate method to eval
         const preTax = parseInt(req.body.preTax);
