@@ -1,0 +1,84 @@
+name: Tarea 07 - DevSecOps SAST SCA SBOM
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sast-semgrep:
+    name: SAST - Semgrep (Quality Gate)
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.185.0
+    steps:
+      - name: Obtener codigo fuente
+        uses: actions/checkout@v4
+
+      - name: Ejecutar analisis Semgrep y exportar JSON
+        run: |
+          mkdir -p reports
+          semgrep scan \
+            --config p/security-audit \
+            --config p/owasp-top-ten \
+            --json \
+            --output reports/semgrep-results.json \
+            .
+
+      - name: Publicar reporte de Semgrep (incluso con hallazgos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-json-report
+          path: reports/semgrep-results.json
+          if-no-files-found: warn
+
+      - name: Aplicar politica SAST - bloquear severidad ERROR
+        run: python3 scripts/quality_gate_semgrep.py reports/semgrep-results.json
+
+  sca-and-sbom:
+    name: SCA - Dependency-Check + SBOM CycloneDX
+    runs-on: ubuntu-latest
+    steps:
+      - name: Obtener codigo fuente
+        uses: actions/checkout@v4
+
+      - name: Generar SBOM CycloneDX con Syft
+        uses: anchore/sbom-action@v0.24.2
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: sbom.cyclonedx.json
+          upload-artifact: false
+
+      - name: Publicar SBOM CycloneDX
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cyclonedx.json
+          if-no-files-found: error
+
+      - name: Analizar dependencias (CVSS 7.0 o superior bloquea)
+        uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c
+        with:
+          project: NodeGoat-Tarea07
+          path: .
+          format: ALL
+          out: reports/dependency-check
+          args: >-
+            --failOnCVSS 7
+            --enableExperimental
+
+      - name: Publicar reportes de Dependency-Check aunque el job falle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-check-reports
+          path: reports/dependency-check/
+          if-no-files-found: warn
