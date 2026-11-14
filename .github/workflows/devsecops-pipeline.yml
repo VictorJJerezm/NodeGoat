@@ -64,6 +64,9 @@ jobs:
           path: sbom.cyclonedx.json
           if-no-files-found: error
 
+      - name: Preparar directorio de reportes SCA
+        run: mkdir -p reports/dependency-check
+
       - name: Analizar dependencias (CVSS 7.0 o superior bloquea)
         uses: dependency-check/Dependency-Check_Action@1e54355a8b4c8abaa8cc7d0b70aa655a3bb15a6c
         with:
